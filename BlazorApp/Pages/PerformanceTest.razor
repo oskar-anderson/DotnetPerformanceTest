@@ -1,0 +1,168 @@
+@page "/PerformanceTest"
+@using Domain
+@using System.Text
+@using System.Numerics
+@using System.Text.Json
+<h3>Canvas</h3>
+@inject IJSRuntime jsRuntime;
+@implements IDisposable
+@inject IJSUnmarshalledRuntime JSUnmarshalledRuntime
+
+@code {
+    
+    public Board Board = new Board(100, 40);
+    private DotNetObjectReference<PerformanceTest>? dotNetHelper;
+    
+    public bool needToExit = false;
+    public Input CleanInput = Input.GetDefaultInput();
+    public ElementReference GameBoardDiv;  // set by the @ref attribute
+    public ElementReference Button;  // set by the @ref attribute
+    public string ButtonText = "Click Me!";
+    public DateTime prevFrameTime = DateTime.Now;
+    
+    public double RunNextFrame(DateTime prevFrameTime)
+    {
+        double deltaTime = (DateTime.Now - prevFrameTime).TotalSeconds;
+        var input = CleanInput;
+        var blazorUpdate = new BlazorUpdateLogic(input);
+        if (blazorUpdate.Update(deltaTime, Board))
+        {
+            throw new Exception("Exited!");
+        }
+        return deltaTime;
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        dotNetHelper = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Console.WriteLine("firstRender");
+            await GameBoardDiv.FocusAsync();
+            await jsRuntime.InvokeVoidAsync("runpixi");
+            Update();
+        }
+
+    }
+
+    [JSInvokable]
+    public string GetDate()
+    {
+        return $"{DateTime.Now.Hour}:{DateTime.Now.Minute}:{DateTime.Now.Second}, {DateTime.Now.Millisecond}";
+    }
+
+    public async void Update()
+    {
+        var deltaTime = RunNextFrame(prevFrameTime);
+        prevFrameTime = prevFrameTime.AddSeconds(deltaTime);
+        
+        // await jsRuntime.InvokeVoidAsync("doNothing", new object[] { (object) System.Text.Json.JsonSerializer.Serialize(DrawArea!.ToJaggedArray())});
+        
+        var start = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
+        
+        var _1_drawDataString = JsonSerializer.Serialize(Board.DrawArea);
+        await jsRuntime.InvokeVoidAsync("PixiMainWithIsJson", _1_drawDataString, Board.FrameCount == 1);
+
+        var end = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
+        Console.WriteLine("Frame rendering took: " + (end - start));
+        
+        
+        // await jsRuntime.InvokeVoidAsync("printDate", dotNetHelper);
+
+        // Console.WriteLine(game.GameData.FrameCount);
+
+        var nDeltaTime = (int) Math.Floor(deltaTime * 1000); // ms
+        var delay = Math.Max(1000 / 30 - nDeltaTime, 1);
+        Console.WriteLine("DeltaTime: " + nDeltaTime + ", FPS cap delay: " + delay);
+        // this.StateHasChanged(); // Force UI update
+        
+        await Task.Delay(delay);
+        
+    }
+
+
+    public void KeyDown(KeyboardEventArgs e)
+    {
+        KeyEvent(e, true);
+        Update();
+    }
+
+    public void KeyUp(KeyboardEventArgs e)
+    {
+        KeyEvent(e, false);
+    }
+
+    public void FocusOut(FocusEventArgs e)
+    {
+        CleanInput = Input.GetDefaultInput();
+    }
+
+    public void KeyEvent(KeyboardEventArgs e, bool isKeyDown)
+    {
+        var supportedKeyboardEventCodes = (from x in Input.GetDefaultInput().Keyboard.KeyboardState select x.Identifier.Key).ToList();
+        if (! supportedKeyboardEventCodes.Contains(e.Code))
+        {
+            return;
+        }
+        var keyboardKey = CleanInput.Keyboard.KeyboardState.Find(
+            x => x.Identifier.Key == e.Code)!;
+        if (isKeyDown)
+        {
+            if (keyboardKey.IsDown())
+            {
+                keyboardKey.Value = Input.BtnState.Echo;
+            }
+            if (keyboardKey.IsReleased())
+            {
+                keyboardKey.Value = Input.BtnState.Pressed;
+            }
+        }
+        else
+        {
+            keyboardKey.Value = Input.BtnState.Released;
+        }
+        Console.WriteLine($"{keyboardKey.Identifier.Key} {nameof(isKeyDown)}={isKeyDown}, " +
+                          $"{nameof(keyboardKey.Value)}={keyboardKey.Value}");
+        
+    }
+    
+
+    public void Dispose()
+    {
+        dotNetHelper?.Dispose();
+        needToExit = true;
+    }
+
+
+    public void changeText()
+    {
+        ButtonText += "!";
+    }
+}
+
+<div class="main">
+    <h2>PerformanceTest</h2>
+    <div>
+        FrameCount: @Board.FrameCount, FPS: @(Board.DeltaTimes.Count == 0 ? 0 : (1 / Board.DeltaTimes.Average()));
+    </div>
+    <button @onclick="changeText">@ButtonText</button>
+    
+    <!-- 
+    class="canvas-container" -> class is targeted in js by pixi.js
+    tabindex="0" -> otherwise focus can not be used
+    @onkeydown="KeyDown" -> handle keyboard key presses 
+    @onkeyup="KeyUp" -> handle keyboard key release, compliments onkeydown
+    @onfocusout="FocusOut" -> used to set input to default when focus is lost
+    @onkeydown:preventDefault -> disable browser built in keybinding. eg. down arrow scrolls page down
+    @ref="GameBoardDiv" -> used to target this element to set focus to it in blazor
+    -->
+    <div class="canvas-container" tabindex="0" @onkeydown="KeyDown" @onkeyup="KeyUp" @onfocusout="FocusOut" @onkeydown:preventDefault @ref="GameBoardDiv">
+    </div>
+    <br/>
+
+
+</div>

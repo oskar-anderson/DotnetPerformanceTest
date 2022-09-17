@@ -1,0 +1,166 @@
+@page "/PerformanceTestAsDom"
+@using Domain
+@using System.Text
+@using System.Numerics
+@using System.Text.Json
+<h3>Canvas</h3>
+@inject IJSRuntime jsRuntime;
+@implements IDisposable
+@inject IJSUnmarshalledRuntime JSUnmarshalledRuntime
+
+@code {
+    
+    public Board Board = new Board(100, 40);
+    private DotNetObjectReference<PerformanceTestAsDom>? dotNetHelper;
+    
+    public bool needToExit = false;
+    public Input CleanInput = Input.GetDefaultInput();
+    public ElementReference Button;  // set by the @ref attribute
+    public string ButtonText = "Click Me!";
+    public DateTime prevFrameTime = DateTime.Now;
+
+    
+    public double RunNextFrame(DateTime prevFrameTime)
+    {
+        double deltaTime = (DateTime.Now - prevFrameTime).TotalSeconds;
+        var input = CleanInput;
+        var blazorUpdate = new BlazorUpdateLogic(input);
+        blazorUpdate.Update(deltaTime, Board);
+        return deltaTime;
+    }
+    
+    protected override Task OnInitializedAsync()
+    {
+        dotNetHelper = DotNetObjectReference.Create(this);
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Update();
+        }
+
+    }
+
+    [JSInvokable]
+    public string GetDate()
+    {
+        return $"{DateTime.Now.Hour}:{DateTime.Now.Minute}:{DateTime.Now.Second}, {DateTime.Now.Millisecond}";
+    }
+
+    public async void Update()
+    {
+        // await jsRuntime.InvokeVoidAsync("JsFunctions.addKeyboardEventListener");
+        
+        var deltaTime = RunNextFrame(prevFrameTime);
+        prevFrameTime = prevFrameTime.AddSeconds(deltaTime);
+            
+        // await jsRuntime.InvokeVoidAsync("doNothing", new object[] { (object) System.Text.Json.JsonSerializer.Serialize(DrawArea!.ToJaggedArray())});
+            
+        var start = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
+        this.StateHasChanged(); // Force UI update
+        var end = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
+        Console.WriteLine("Frame rendering took: " + (end - start));
+            
+            
+        // await jsRuntime.InvokeVoidAsync("printDate", dotNetHelper);
+
+        // Console.WriteLine(game.GameData.FrameCount);
+
+        var nDeltaTime = (int) Math.Floor(deltaTime * 1000);
+        var delay = Math.Max(1000 / 60 - nDeltaTime, 1);
+        Console.WriteLine("FPS cap delay: " + delay);
+
+        await Task.Delay(delay);
+    }
+
+
+    public async void KeyDown(KeyboardEventArgs e)
+    {
+        Console.WriteLine("KeyDown: " + e.Key);
+        KeyEvent(e, true);
+        Update();
+    }
+
+    public void KeyUp(KeyboardEventArgs e)
+    {
+        KeyEvent(e, false);
+    }
+
+    public void FocusOut(FocusEventArgs e)
+    {
+        CleanInput = Input.GetDefaultInput();
+    }
+
+    public void KeyEvent(KeyboardEventArgs e, bool isKeyDown)
+    {
+        var supportedKeyboardEventCodes = (from x in Input.GetDefaultInput().Keyboard.KeyboardState select x.Identifier.Key).ToList();
+        if (! supportedKeyboardEventCodes.Contains(e.Code))
+        {
+            return;
+        }
+        var keyboardKey = CleanInput.Keyboard.KeyboardState.Find(
+            x => x.Identifier.Key == e.Code)!;
+        if (isKeyDown)
+        {
+            if (keyboardKey.IsDown())
+            {
+                keyboardKey.Value = Input.BtnState.Echo;
+            }
+            if (keyboardKey.IsReleased())
+            {
+                keyboardKey.Value = Input.BtnState.Pressed;
+            }
+        }
+        else
+        {
+            keyboardKey.Value = Input.BtnState.Released;
+        }
+        Console.WriteLine($"{keyboardKey.Identifier.Key} {nameof(isKeyDown)}={isKeyDown}, " +
+                          $"{nameof(keyboardKey.Value)}={keyboardKey.Value}");
+        
+    }
+    
+
+    public void Dispose()
+    {
+        dotNetHelper?.Dispose();
+        needToExit = true;
+    }
+
+
+    public void changeText()
+    {
+        ButtonText += "!";
+    }
+}
+
+
+
+<div class="main">
+    <h2>PerformanceTestAsDom</h2>
+    <div>
+        FrameCount: @Board.FrameCount, FPS: @(Board.DeltaTimes.Count == 0 ? 0 : (1 / Board.DeltaTimes.Average()));
+    </div>
+    <button @onclick="changeText">@ButtonText</button>
+    
+    <div class="PressStart2PFont" style="user-select: none;" tabindex="0" @onkeydown="KeyDown" @onkeyup="KeyUp" @onfocusout="FocusOut" @onkeydown:preventDefault>
+        
+        @for (var y = 0; y < Board.Height; y++)
+        {
+            <div style="line-height: 8px;">
+            @for (var x = 0; x < Board.Width; x++)
+            {
+                <span>@Board.DrawArea[y * Board.Width + x].Char</span> 
+                // <span style="color: rgb(@Board.DrawArea[y * Board.Width + x].ColorRGBr, @Board.DrawArea[y * Board.Width + x].ColorRGBg, @Board.DrawArea[y * Board.Width + x].ColorRGBb)">@Board.DrawArea[y * Board.Width + x].Char</span>
+            }
+            </div>
+        }
+    </div>
+
+    <br/>
+
+
+</div>
