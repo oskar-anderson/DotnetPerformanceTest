@@ -32,56 +32,64 @@ var frameCount = 0;
 var deltaTimes = new List<double>();
 var stopwatch = new Stopwatch();
 stopwatch.Start();
+var pressedKeyList = new List<Keyboard.Key>();
+window.KeyPressed += Window_KeyPressed;
+window.KeyReleased += Window_KeyReleased;
+
+
+void Init()
+{
+    for (int y = 0; y < height; y++)
+    {
+        for (int x = 0; x < width; x++)
+        {
+            var text = new Text(
+                chars[random.Next() % chars.Length].ToString(),
+                font)
+            {
+                Position = new Vector2f(
+                    x * 8,
+                    y * 8),
+                CharacterSize = 8
+            };
+            displayedText.Add(text);
+
+            var sprite = new Sprite(textures[random.Next() % textures.Count])
+            {
+                Position = new Vector2f(
+                    x * 8,
+                    y * 8
+                )
+            };
+
+            displayedSprites.Add(sprite);
+        }
+    }
+}
+Init();
 
 while (window.IsOpen)
 {
-    window.DispatchEvents();
     window.Clear();
-
+    window.DispatchEvents();
     
     for (int y = 0; y < height; y++)
     {
         for (int x = 0; x < width; x++)
         {
-            if (frameCount == 0)
-            {
-                var text = new Text(
-                    chars[random.Next() % chars.Length].ToString(), 
-                    font)
-                {
-                    Position = new Vector2f(
-                        x * 8, 
-                        y * 8), 
-                    CharacterSize = 8
-                };
-                displayedText.Add(text);
-
-                var sprite = new Sprite(textures[random.Next() % textures.Count])
-                {
-                    Position = new Vector2f(
-                        x * 8,
-                        y * 8
-                    )
-                };
-                
-                displayedSprites.Add(sprite);
-            }
-            if (SFML.Window.Keyboard.IsKeyPressed(Keyboard.Key.Q))
-            {
-                displayedText[y * width + x].DisplayedString = chars[random.Next(0, chars.Length)].ToString();
-            }
-            if (SFML.Window.Keyboard.IsKeyPressed(Keyboard.Key.W) || frameCount == 0)
+            if (pressedKeyList.Contains(Keyboard.Key.W))
             {
                 window.Draw(displayedText[y * width + x]);
             }
-            if (SFML.Window.Keyboard.IsKeyPressed(Keyboard.Key.E))
+            if (pressedKeyList.Contains(Keyboard.Key.Q))
+                displayedText[y * width + x].DisplayedString = chars[random.Next(chars.Length)].ToString();
+            
+            if (pressedKeyList.Contains(Keyboard.Key.E))
             {
-                displayedSprites[y * width + x].Texture = textures[random.Next(0, textures.Count)];
+                displayedSprites[y * width + x].Texture = textures[random.Next(textures.Count)];
+                displayedSprites[y * width + x].Position = new Vector2f(random.Next((int) window.Size.X), random.Next((int) window.Size.Y));
                 window.Draw(displayedSprites[y * width + x]);
             }
-
-
-
         }
     }
 
@@ -99,3 +107,18 @@ while (window.IsOpen)
     window.Display();
 }
 
+
+void Window_KeyPressed(object? sender, SFML.Window.KeyEventArgs e)
+{
+    if (! pressedKeyList.Contains(e.Code))
+    {
+        pressedKeyList.Add(e.Code);   
+    }
+}
+
+void Window_KeyReleased(object? sender, SFML.Window.KeyEventArgs e) {
+    if (pressedKeyList.Contains(e.Code))
+    {
+        pressedKeyList.Remove(e.Code);   
+    }
+}
