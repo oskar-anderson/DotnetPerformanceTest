@@ -3,7 +3,6 @@
 @using System.Text
 @using System.Numerics
 @using System.Text.Json
-<h3>Canvas</h3>
 @inject IJSRuntime jsRuntime;
 @implements IDisposable
 @inject IJSUnmarshalledRuntime JSUnmarshalledRuntime
@@ -16,7 +15,7 @@
     public bool needToExit = false;
     public Input CleanInput = Input.GetDefaultInput();
     public ElementReference Button;  // set by the @ref attribute
-    public string ButtonText = "Click Me!";
+    public bool IsActive = false;
     public DateTime prevFrameTime = DateTime.Now;
 
     
@@ -50,7 +49,7 @@
         return $"{DateTime.Now.Hour}:{DateTime.Now.Minute}:{DateTime.Now.Second}, {DateTime.Now.Millisecond}";
     }
 
-    public async void Update()
+    public async Task Update()
     {
         // await jsRuntime.InvokeVoidAsync("JsFunctions.addKeyboardEventListener");
         
@@ -58,13 +57,13 @@
         prevFrameTime = prevFrameTime.AddSeconds(deltaTime);
             
         // await jsRuntime.InvokeVoidAsync("doNothing", new object[] { (object) System.Text.Json.JsonSerializer.Serialize(DrawArea!.ToJaggedArray())});
-            
+        
         var start = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
         this.StateHasChanged(); // Force UI update
         var end = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
         Console.WriteLine("Frame rendering took: " + (end - start));
-            
-            
+        
+        
         // await jsRuntime.InvokeVoidAsync("printDate", dotNetHelper);
 
         // Console.WriteLine(game.GameData.FrameCount);
@@ -79,9 +78,8 @@
 
     public async void KeyDown(KeyboardEventArgs e)
     {
-        Console.WriteLine("KeyDown: " + e.Key);
         KeyEvent(e, true);
-        Update();
+        await Update();
     }
 
     public void KeyUp(KeyboardEventArgs e)
@@ -131,9 +129,25 @@
     }
 
 
-    public void changeText()
+    public async Task UpdateLoop()
     {
-        ButtonText += "!";
+        Console.WriteLine(nameof(UpdateLoop));
+        await Update();
+        if (IsActive)
+        {
+            await UpdateLoop();
+        }
+    }
+
+    public async Task Activate()
+    {
+        IsActive = true;
+        await UpdateLoop();
+    }
+
+    public void Disable()
+    {
+        IsActive = false;
     }
 }
 
@@ -141,10 +155,12 @@
 
 <div class="main">
     <h2>PerformanceTestAsDom</h2>
+    <p>Force refresh just in case (ctrl+F5)</p>
     <div>
         FrameCount: @Board.FrameCount, FPS: @(Board.DeltaTimes.Count == 0 ? 0 : (1 / Board.DeltaTimes.Average()));
     </div>
-    <button @onclick="changeText">@ButtonText</button>
+    <button @onclick="Activate">Activate</button>
+    <button @onclick="Disable">Disable</button>
     
     <div class="PressStart2PFont" style="user-select: none;" tabindex="0" @onkeydown="KeyDown" @onkeyup="KeyUp" @onfocusout="FocusOut" @onkeydown:preventDefault>
         

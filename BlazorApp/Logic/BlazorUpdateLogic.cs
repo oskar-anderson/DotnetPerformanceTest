@@ -52,11 +52,7 @@ public class BlazorUpdateLogic
                     text = fpsCounter.Length > x ? fpsCounter.Substring(x, 1) : " ";
                 }
                 board.DrawArea[y * board.Width + x] = new CharInfo() {
-                    Char = text, 
-                    ColorRGBr = random.Next(0, 255).ToString(), 
-                    ColorRGBg = random.Next(0, 255).ToString(), 
-                    ColorRGBb = random.Next(0, 255).ToString()
-                    
+                    Char = text,
                 };
             }
         }

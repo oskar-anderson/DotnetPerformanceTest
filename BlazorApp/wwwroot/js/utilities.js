@@ -119,6 +119,10 @@ async function getTime() {
     return Date.now().toString();
 }
 
+function PixiMain(drawArea, isFirstRun) {
+    pixiMain(drawArea, isFirstRun, false, false)
+}
+
 function PixiMainWithIsJson(drawArea, isFirstRun) {
     pixiMain(drawArea, isFirstRun, true, false)
 }
@@ -132,28 +136,13 @@ function pixiMain(drawArea, isFirstRun, isJson, isUnmarshalled) {
     // The application will create a renderer using WebGL, if possible,
     // with a fallback to a canvas render.
     
-
     drawArea = isUnmarshalled ? BINDING.conv_string(drawArea) : drawArea;       // Convert the handle to a JS string
-    drawArea = isJson ? JSON.parse(drawArea) : isJson;
+    drawArea = isJson ? JSON.parse(drawArea) : drawArea;
     
 
     if (isFirstRun) {
-        console.log("in pixiMain");
-        console.log(drawArea);
-        console.log(app.stage.children);
+        console.log(drawArea, isFirstRun, isJson, isUnmarshalled);
     }
-    
-    /*
-    let start = performance.now();
-    let children = app.stage.removeChildren();  // removes previous stage effectively clearing the screen
-    for (const child of children) {
-        child.destroy(true);
-    }
-    
-     
-    console.log(`destroy took ${performance.now() - start} ms`)
-    
-     */
     
     let height = 40;
     let width = 100;
@@ -162,7 +151,7 @@ function pixiMain(drawArea, isFirstRun, isJson, isUnmarshalled) {
             let tile = drawArea[y * width + x];
             if (! isFirstRun) {
                 app.stage.children[y * width + x].text = tile.Char;
-                app.stage.children[y * width + x].tint = rgbToHex(tile.ColorRGBr, tile.ColorRGBg, tile.ColorRGBb);
+                // app.stage.children[y * width + x].tint = rgbToHex(tile.ColorRGBr, tile.ColorRGBg, tile.ColorRGBb);
             } else {
                 let scale = 1;
                 let fontSize = 8;
@@ -174,9 +163,9 @@ function pixiMain(drawArea, isFirstRun, isJson, isUnmarshalled) {
                         fontSize: fontSize,
                         align: "right"
                     });
-                    textChar.tint = rgbToHex(tile.ColorRGBr, tile.ColorRGBg, tile.ColorRGBb);
+                    // textChar.tint = rgbToHex(tile.ColorRGBr, tile.ColorRGBg, tile.ColorRGBb);
                 } else {
-                
+                    // really slow
                     textChar = new PIXI.Text(tile.Char);
                     textChar.style = new PIXI.TextStyle(
                         {
@@ -197,41 +186,4 @@ function pixiMain(drawArea, isFirstRun, isJson, isUnmarshalled) {
             }
         }
     }
-
-    /* 
-    // load the texture we need
-    app.loader.add('bunny', 'images/bunny.png').load((loader, resources) => {
-        // This creates a texture from a 'bunny.png' image
-        const bunny = new PIXI.Sprite(resources.bunny.texture);
-
-        // Setup the position of the bunny
-        bunny.x = app.renderer.width / 2;
-        bunny.y = app.renderer.height / 2;
-        bunny.scale.x = 0.3;
-        bunny.scale.y = 0.3;
-        // Rotate around the center
-        bunny.anchor.x = 0.5;
-        bunny.anchor.y = 0.5;
-
-        // Add the bunny to the scene we are building
-
-        // -----
-
-        // -------
-
-
-        app.stage.addChild(bunny);
-
-        // Listen for frame updates
-        app.ticker.add(() => {
-            // each frame we spin the bunny around a bit
-            bunny.rotation += 0.01;
-        });
-        
-
-    });
-    
-    
-     */
-
 }

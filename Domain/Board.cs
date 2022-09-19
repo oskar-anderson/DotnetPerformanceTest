@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Domain;
 
 public class Board
@@ -24,9 +26,6 @@ public class Board
                 DrawArea.Add(new CharInfo()
                 {
                     Char = " ",
-                    ColorRGBr = "255", 
-                    ColorRGBg = "255", 
-                    ColorRGBb = "255"
                 });
             }
         }
@@ -36,8 +35,5 @@ public class Board
 public class CharInfo
 {
     public string Char { get; set; }
-    public string ColorRGBr { get; set; }
-    
-    public string ColorRGBg { get; set; }
-    public string ColorRGBb { get; set; }
+
 }

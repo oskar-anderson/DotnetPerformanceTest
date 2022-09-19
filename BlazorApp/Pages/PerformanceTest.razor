@@ -3,8 +3,8 @@
 @using System.Text
 @using System.Numerics
 @using System.Text.Json
-<h3>Canvas</h3>
 @inject IJSRuntime jsRuntime;
+@inject IJSInProcessRuntime JSInProcessRuntime
 @implements IDisposable
 @inject IJSUnmarshalledRuntime JSUnmarshalledRuntime
 
@@ -17,8 +17,9 @@
     public Input CleanInput = Input.GetDefaultInput();
     public ElementReference GameBoardDiv;  // set by the @ref attribute
     public ElementReference Button;  // set by the @ref attribute
-    public string ButtonText = "Click Me!";
+    public bool IsActive = false;
     public DateTime prevFrameTime = DateTime.Now;
+    public string _1_drawDataString = "";
     
     public double RunNextFrame(DateTime prevFrameTime)
     {
@@ -43,6 +44,8 @@
         {
             Console.WriteLine("firstRender");
             await GameBoardDiv.FocusAsync();
+            var unmarshalledJs = (IJSUnmarshalledRuntime) JSUnmarshalledRuntime;
+            // unmarshalledJs.InvokeUnmarshalled<string>("runpixi"); await Task.Delay(2000);
             await jsRuntime.InvokeVoidAsync("runpixi");
             Update();
         }
@@ -55,7 +58,7 @@
         return $"{DateTime.Now.Hour}:{DateTime.Now.Minute}:{DateTime.Now.Second}, {DateTime.Now.Millisecond}";
     }
 
-    public async void Update()
+    public async Task Update()
     {
         var deltaTime = RunNextFrame(prevFrameTime);
         prevFrameTime = prevFrameTime.AddSeconds(deltaTime);
@@ -64,9 +67,15 @@
         
         var start = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
         
-        var _1_drawDataString = JsonSerializer.Serialize(Board.DrawArea);
-        await jsRuntime.InvokeVoidAsync("PixiMainWithIsJson", _1_drawDataString, Board.FrameCount == 1);
-
+        _1_drawDataString = JsonSerializer.Serialize(Board.DrawArea);
+        
+        // 15.1
+        JSUnmarshalledRuntime.InvokeUnmarshalled<string, bool, string>("PixiMainWithIsJsonIsUnmarshalled", _1_drawDataString, Board.FrameCount == 1);
+        // 12.2
+        // await jsRuntime.InvokeVoidAsync("PixiMainWithIsJson", _1_drawDataString, Board.FrameCount == 1);
+        // 12.2
+        // JSInProcessRuntime.Invoke<string>("PixiMainWithIsJson", _1_drawDataString, Board.FrameCount == 1);
+            
         var end = BigInteger.Parse(await jsRuntime.InvokeAsync<string>("getTime"));
         Console.WriteLine("Frame rendering took: " + (end - start));
         
@@ -76,9 +85,9 @@
         // Console.WriteLine(game.GameData.FrameCount);
 
         var nDeltaTime = (int) Math.Floor(deltaTime * 1000); // ms
-        var delay = Math.Max(1000 / 30 - nDeltaTime, 1);
+        var delay = Math.Max(1000 / 60 - nDeltaTime, 1);
         Console.WriteLine("DeltaTime: " + nDeltaTime + ", FPS cap delay: " + delay);
-        // this.StateHasChanged(); // Force UI update
+        this.StateHasChanged(); // Force UI update
         
         await Task.Delay(delay);
         
@@ -137,19 +146,36 @@
         needToExit = true;
     }
 
-
-    public void changeText()
+    public async Task UpdateLoop()
     {
-        ButtonText += "!";
+        Console.WriteLine(nameof(UpdateLoop));
+        await Update();
+        if (IsActive)
+        {
+            await UpdateLoop();
+        }
+    }
+
+    public async Task Activate()
+    {
+        IsActive = true;
+        await UpdateLoop();
+    }
+
+    public void Disable()
+    {
+        IsActive = false;
     }
 }
 
 <div class="main">
     <h2>PerformanceTest</h2>
+    <p>Force refresh just in case (ctrl+F5)</p>
     <div>
         FrameCount: @Board.FrameCount, FPS: @(Board.DeltaTimes.Count == 0 ? 0 : (1 / Board.DeltaTimes.Average()));
     </div>
-    <button @onclick="changeText">@ButtonText</button>
+    <button @onclick="Activate">Activate</button>
+    <button @onclick="Disable">Disable</button>
     
     <!-- 
     class="canvas-container" -> class is targeted in js by pixi.js
